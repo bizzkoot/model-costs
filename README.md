@@ -14,6 +14,8 @@ the real cost of each model before you switch.
   - same flow as `/model`: arrows to navigate, type to fuzzy-filter, `Tab`
     toggles all/scoped (when scoped models are configured), `Enter` selects,
     `Esc` cancels
+  - `Ctrl+S` cycles cost sort: default → in↑/↓ → out↑/↓ → total↑/↓
+    (total = input + output); the footer legend shows the active sort
 - **Footer status** — pricing of the currently active model in the footer
   (disable it by setting `SHOW_STATUS = false` in the source).
 
@@ -23,16 +25,39 @@ The current model is marked with a ✓ and sorted to the top.
 
 ## Install
 
+> Fork of
+> [MaurizioFaeddaDev/model-costs](https://github.com/MaurizioFaeddaDev/model-costs)
+> — adds `Ctrl+S` cost sorting. Upstream installs keep working; use below to
+> switch to this fork (run only one copy — both register `/model-cost`).
+
 ```bash
-# from npm (recommended)
+# check what you have
+pi list
+
+# from upstream npm -> this fork
+pi remove npm:pi-model-costs
+pi install git:github.com/bizzkoot/model-costs
+
+# from upstream git -> this fork
+pi remove git:github.com/MaurizioFaeddaDev/model-costs
+pi install git:github.com/bizzkoot/model-costs
+
+# update this fork later
+pi update git:github.com/bizzkoot/model-costs
+
+# switch back to upstream (npm or git)
+pi remove git:github.com/bizzkoot/model-costs
 pi install npm:pi-model-costs
-
-# from the gallery or a git repo
-pi install git:github.com/MaurizioFaeddaDev/model-costs
-
-# or, to try without installing:
-pi -e npm:pi-model-costs
+# or: pi install git:github.com/MaurizioFaeddaDev/model-costs
 ```
+
+To try this fork without installing:
+
+```bash
+pi -e git:github.com/bizzkoot/model-costs
+```
+
+> `pi remove` needs the exact source string shown by `pi list`.
 
 > Only interactive (`tui`) mode supports the custom picker. In print/RPC mode
 > the command notifies you that it is unavailable.
@@ -44,6 +69,9 @@ pi -e npm:pi-model-costs
 /model-cost claude       # fuzzy-filter by provider/id/name
 /model-cost $0.00        # fuzzy-filter by cost
 ```
+
+Inside the picker, `Ctrl+S` cycles the cost sort; the footer legend shows
+the active sort, e.g. `ctrl+s sort (in↑)`.
 
 `/model-cost` extends the built-in `/model` selector; the actual model switch
 still goes through pi's normal `setModel` path, so API keys are resolved the

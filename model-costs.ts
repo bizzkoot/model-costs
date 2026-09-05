@@ -71,6 +71,22 @@ interface Picked {
 	thinkingLevel?: ThinkingLevel;
 }
 
+type SortMode = "default" | "input-asc" | "input-desc" | "output-asc" | "output-desc" | "total-asc" | "total-desc";
+
+const SORT_ORDER: SortMode[] = ["default", "input-asc", "input-desc", "output-asc", "output-desc", "total-asc", "total-desc"];
+
+function sortLabel(mode: SortMode): string {
+	switch (mode) {
+		case "input-asc": return "in↑";
+		case "input-desc": return "in↓";
+		case "output-asc": return "out↑";
+		case "output-desc": return "out↓";
+		case "total-asc": return "total↑";
+		case "total-desc": return "total↓";
+		default: return "default";
+	}
+}
+
 class ModelCostPicker extends Container implements Focusable {
 	private searchInput = new Input();
 	private listContainer = new Container();
@@ -93,6 +109,8 @@ class ModelCostPicker extends Container implements Focusable {
 	private selectedIndex = 0;
 	private scope: "all" | "scoped";
 	private scopeText: Text | undefined;
+	private sortMode: SortMode = "default";
+	private footerText!: Text;
 
 	constructor(
 		private tui: import("@earendil-works/pi-tui").TUI,
@@ -135,7 +153,8 @@ class ModelCostPicker extends Container implements Focusable {
 		this.addChild(this.detailContainer);
 
 		this.addChild(new Spacer(1));
-		this.addChild(new Text(theme.fg("dim", "  ↑↓ navigate · Enter select · Esc cancel · prices per 1M tokens"), 0, 0));
+		this.footerText = new Text(this.renderFooter(), 0, 0);
+		this.addChild(this.footerText);
 		this.addChild(new DynamicBorder((s) => theme.fg("accent", s)));
 
 		const currentIndex = this.activeItems.findIndex((item) => sameModel(this.currentModel, item.model));
@@ -143,17 +162,37 @@ class ModelCostPicker extends Container implements Focusable {
 		this.applyFilter(initialQuery ?? "");
 	}
 
+	private compareItems(a: ModelItem, b: ModelItem): number {
+		const aCurrent = sameModel(this.currentModel, a.model);
+		const bCurrent = sameModel(this.currentModel, b.model);
+		if (aCurrent && !bCurrent) return -1;
+		if (!aCurrent && bCurrent) return 1;
+		const dir = this.sortMode.endsWith("desc") ? -1 : 1;
+		let diff = 0;
+		if (this.sortMode.startsWith("input")) diff = a.model.cost.input - b.model.cost.input;
+		else if (this.sortMode.startsWith("output")) diff = a.model.cost.output - b.model.cost.output;
+		else if (this.sortMode.startsWith("total")) diff = (a.model.cost.input + a.model.cost.output) - (b.model.cost.input + b.model.cost.output);
+		if (diff !== 0) return diff * dir;
+		const byProvider = a.model.provider.localeCompare(b.model.provider);
+		return byProvider !== 0 ? byProvider : a.model.id.localeCompare(b.model.id);
+	}
+
 	private sortItems(items: ModelItem[]): ModelItem[] {
-		const sorted = [...items];
-		sorted.sort((a, b) => {
-			const aCurrent = sameModel(this.currentModel, a.model);
-			const bCurrent = sameModel(this.currentModel, b.model);
-			if (aCurrent && !bCurrent) return -1;
-			if (!aCurrent && bCurrent) return 1;
-			const byProvider = a.model.provider.localeCompare(b.model.provider);
-			return byProvider !== 0 ? byProvider : a.model.id.localeCompare(b.model.id);
-		});
-		return sorted;
+		return [...items].sort((a, b) => this.compareItems(a, b));
+	}
+
+	private renderFooter(): string {
+		return this.theme.fg("dim", `  ↑↓ navigate · Enter select · Esc cancel · ctrl+s sort (${sortLabel(this.sortMode)}) · prices per 1M tokens`);
+	}
+
+	private cycleSort(): void {
+		this.sortMode = SORT_ORDER[(SORT_ORDER.indexOf(this.sortMode) + 1) % SORT_ORDER.length] as SortMode;
+		// ponytail: re-sort cached lists in place, full re-query if model count grows large
+		this.allItems = this.sortItems(this.allItems);
+		this.scopedItems = this.sortItems(this.scopedItems);
+		this.activeItems = this.scope === "scoped" ? this.scopedItems : this.allItems;
+		this.footerText.setText(this.renderFooter());
+		this.applyFilter(this.searchInput.getValue());
 	}
 
 	private renderScopeText(): string {
@@ -276,6 +315,8 @@ class ModelCostPicker extends Container implements Focusable {
 			this.selectedIndex = currentIndex >= 0 ? currentIndex : 0;
 			if (this.scopeText) this.scopeText.setText(this.renderScopeText());
 			this.applyFilter(this.searchInput.getValue());
+		} else if (matchesKey(data, "ctrl+s")) {
+			this.cycleSort();
 		} else if (matchesKey(data, "up")) {
 			if (this.filtered.length === 0) return;
 			this.selectedIndex = this.selectedIndex === 0 ? this.filtered.length - 1 : this.selectedIndex - 1;
