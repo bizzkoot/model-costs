@@ -196,6 +196,10 @@ class ModelCostPicker extends Container implements Focusable {
 		this.activeItems = this.scope === "scoped" ? this.scopedItems : this.allItems;
 		this.footerText.setText(this.renderFooter());
 		this.applyFilter(this.searchInput.getValue());
+		// ponytail: jump selection to current model so it stays visible after re-sort
+		const curIdx = this.filtered.findIndex((item) => sameModel(this.currentModel, item.model));
+		this.selectedIndex = curIdx >= 0 ? curIdx : 0;
+		this.updateList();
 	}
 
 	private renderScopeText(): string {
