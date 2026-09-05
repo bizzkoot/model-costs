@@ -19,7 +19,8 @@ the real cost of each model before you switch.
 - **Footer status** — pricing of the currently active model in the footer
   (disable it by setting `SHOW_STATUS = false` in the source).
 
-The current model is marked with a ✓ and sorted to the top.
+The current model is marked with a ✓ — pinned to the top in default sort,
+at its ranked position in cost sorts.
 
 ![model-cost picker](images/model-cost.png)
 

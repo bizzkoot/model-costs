@@ -163,10 +163,13 @@ class ModelCostPicker extends Container implements Focusable {
 	}
 
 	private compareItems(a: ModelItem, b: ModelItem): number {
-		const aCurrent = sameModel(this.currentModel, a.model);
-		const bCurrent = sameModel(this.currentModel, b.model);
-		if (aCurrent && !bCurrent) return -1;
-		if (!aCurrent && bCurrent) return 1;
+		// ponytail: pin current-model on top only in default mode; cost sorts rank it purely
+		if (this.sortMode === "default") {
+			const aCurrent = sameModel(this.currentModel, a.model);
+			const bCurrent = sameModel(this.currentModel, b.model);
+			if (aCurrent && !bCurrent) return -1;
+			if (!aCurrent && bCurrent) return 1;
+		}
 		const dir = this.sortMode.endsWith("desc") ? -1 : 1;
 		let diff = 0;
 		if (this.sortMode.startsWith("input")) diff = a.model.cost.input - b.model.cost.input;
