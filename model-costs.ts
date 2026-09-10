@@ -13,6 +13,9 @@
  *                          (set SHOW_STATUS = false below to disable).
  */
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import type { Api, Model, ModelCostTier, ThinkingLevel } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { DynamicBorder } from "@earendil-works/pi-coding-agent";
@@ -75,6 +78,28 @@ type SortMode = "default" | "input-asc" | "input-desc" | "output-asc" | "output-
 
 const SORT_ORDER: SortMode[] = ["default", "input-asc", "input-desc", "output-asc", "output-desc", "total-asc", "total-desc"];
 
+const SORT_STATE_FILE = join(homedir(), ".pi", "agent", "model-costs.json");
+
+function loadSavedSortMode(): SortMode {
+	try {
+		const raw = readFileSync(SORT_STATE_FILE, "utf8");
+		const parsed: unknown = JSON.parse(raw);
+		const mode = (parsed as { sortMode?: unknown } | null)?.sortMode;
+		return SORT_ORDER.includes(mode as SortMode) ? (mode as SortMode) : "default";
+	} catch {
+		return "default";
+	}
+}
+
+function saveSortMode(mode: SortMode): void {
+	try {
+		mkdirSync(dirname(SORT_STATE_FILE), { recursive: true });
+		writeFileSync(SORT_STATE_FILE, JSON.stringify({ sortMode: mode }), "utf8");
+	} catch {
+		// ponytail: persistence is best-effort, never break the picker
+	}
+}
+
 function sortLabel(mode: SortMode): string {
 	switch (mode) {
 		case "input-asc": return "in↑";
@@ -109,7 +134,7 @@ class ModelCostPicker extends Container implements Focusable {
 	private selectedIndex = 0;
 	private scope: "all" | "scoped";
 	private scopeText: Text | undefined;
-	private sortMode: SortMode = "default";
+	private sortMode: SortMode = loadSavedSortMode();
 	private footerText!: Text;
 
 	constructor(
@@ -190,6 +215,7 @@ class ModelCostPicker extends Container implements Focusable {
 
 	private cycleSort(): void {
 		this.sortMode = SORT_ORDER[(SORT_ORDER.indexOf(this.sortMode) + 1) % SORT_ORDER.length] as SortMode;
+		saveSortMode(this.sortMode);
 		// ponytail: re-sort cached lists in place, full re-query if model count grows large
 		this.allItems = this.sortItems(this.allItems);
 		this.scopedItems = this.sortItems(this.scopedItems);
