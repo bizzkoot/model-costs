@@ -33,6 +33,7 @@ function trimZeros(s: string): string {
 
 /** Cost rates are USD per 1M tokens. */
 function money(n: number): string {
+	if (!(n >= 0)) return "n/a"; // negative = "pricing unknown" sentinel (e.g. openrouter/auto)
 	if (n === 0) return "0";
 	if (n >= 100) return n.toFixed(0);
 	if (n >= 1) return trimZeros(n.toFixed(2));
@@ -96,7 +97,7 @@ function saveSortMode(mode: SortMode): void {
 		mkdirSync(dirname(SORT_STATE_FILE), { recursive: true });
 		writeFileSync(SORT_STATE_FILE, JSON.stringify({ sortMode: mode }), "utf8");
 	} catch {
-		// ponytail: persistence is best-effort, never break the picker
+		// persistence is best-effort, never break the picker
 	}
 }
 
@@ -188,13 +189,18 @@ class ModelCostPicker extends Container implements Focusable {
 	}
 
 	private compareItems(a: ModelItem, b: ModelItem): number {
-		// ponytail: pin current-model on top only in default mode; cost sorts rank it purely
+		// pin current-model on top only in default mode; cost sorts rank it purely
 		if (this.sortMode === "default") {
 			const aCurrent = sameModel(this.currentModel, a.model);
 			const bCurrent = sameModel(this.currentModel, b.model);
 			if (aCurrent && !bCurrent) return -1;
 			if (!aCurrent && bCurrent) return 1;
 		}
+		// unknown pricing (negative sentinel) always sorts last, both directions
+		const unknown = (v: number) => !(v >= 0);
+		const aBad = unknown(a.model.cost.input) || unknown(a.model.cost.output);
+		const bBad = unknown(b.model.cost.input) || unknown(b.model.cost.output);
+		if (aBad !== bBad) return aBad ? 1 : -1;
 		const dir = this.sortMode.endsWith("desc") ? -1 : 1;
 		let diff = 0;
 		if (this.sortMode.startsWith("input")) diff = a.model.cost.input - b.model.cost.input;
@@ -216,13 +222,13 @@ class ModelCostPicker extends Container implements Focusable {
 	private cycleSort(): void {
 		this.sortMode = SORT_ORDER[(SORT_ORDER.indexOf(this.sortMode) + 1) % SORT_ORDER.length] as SortMode;
 		saveSortMode(this.sortMode);
-		// ponytail: re-sort cached lists in place, full re-query if model count grows large
+		// re-sort cached lists in place, full re-query if model count grows large
 		this.allItems = this.sortItems(this.allItems);
 		this.scopedItems = this.sortItems(this.scopedItems);
 		this.activeItems = this.scope === "scoped" ? this.scopedItems : this.allItems;
 		this.footerText.setText(this.renderFooter());
 		this.applyFilter(this.searchInput.getValue());
-		// ponytail: jump selection to current model so it stays visible after re-sort
+		// jump selection to current model so it stays visible after re-sort
 		const curIdx = this.filtered.findIndex((item) => sameModel(this.currentModel, item.model));
 		this.selectedIndex = curIdx >= 0 ? curIdx : 0;
 		this.updateList();
